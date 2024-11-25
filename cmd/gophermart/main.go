@@ -1,6 +1,7 @@
 package main
 
 import (
+	"github.com/gitslim/gophermart/internal/accrual"
 	"github.com/gitslim/gophermart/internal/conf"
 	"github.com/gitslim/gophermart/internal/logging"
 	"github.com/gitslim/gophermart/internal/logging/sugared"
@@ -36,11 +37,15 @@ func CreateApp() fx.Option {
 			fx.Annotate(postgres.NewPgStorage, fx.As(new(storage.Storage))),
 		),
 
+		// Клиент системы начислений
+		fx.Provide(accrual.NewClient),
+
 		// Сервисы
 		fx.Provide(
 			fx.Annotate(user.NewUserService, fx.As(new(service.UserService))),
 			fx.Annotate(order.NewOrderService, fx.As(new(service.OrderService))),
 			fx.Annotate(balance.NewBalanceService, fx.As(new(service.BalanceService))),
+			order.NewWorker,
 		),
 
 		// Веб-компоненты
@@ -56,9 +61,10 @@ func CreateApp() fx.Option {
 			migrations.RunMigrations,
 		),
 
+		// Запуск воркера обработки заказов
+		fx.Invoke(order.RegisterWorkerHooks),
+
 		// Запуск сервера
-		fx.Invoke(
-			web.RegisterServerHooks,
-		),
+		fx.Invoke(web.RegisterServerHooks),
 	)
 }

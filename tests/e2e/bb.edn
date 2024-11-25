@@ -1,0 +1,2 @@
+{:paths ["bb"]
+ :deps {medley/medley {:mvn/version "1.3.0"}}}

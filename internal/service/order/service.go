@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/gitslim/gophermart/internal/accrual"
 	"github.com/gitslim/gophermart/internal/models"
 	"github.com/gitslim/gophermart/internal/service"
 	"github.com/gitslim/gophermart/internal/storage"
@@ -12,13 +13,15 @@ import (
 
 // OrderServiceImpl реализует интерфейс service.OrderService
 type OrderServiceImpl struct {
-	storage storage.Storage
+	storage       storage.Storage
+	accrualClient *accrual.Client
 }
 
 // NewOrderService создает новый экземпляр сервиса заказов
-func NewOrderService(storage storage.Storage) service.OrderService {
+func NewOrderService(storage storage.Storage, accrualClient *accrual.Client) service.OrderService {
 	return &OrderServiceImpl{
-		storage: storage,
+		storage:       storage,
+		accrualClient: accrualClient,
 	}
 }
 
@@ -66,10 +69,35 @@ func (s *OrderServiceImpl) ProcessOrder(ctx context.Context, orderNumber string)
 		return fmt.Errorf("order not found")
 	}
 
-	// TODO: Здесь должна быть логика взаимодействия с системой начисления баллов
-	// Пока просто обновляем статус
-	if err := s.storage.UpdateOrderStatus(ctx, order.ID, models.OrderStatusProcessed, 0); err != nil {
-		return fmt.Errorf("failed to update order status: %w", err)
+	// Получаем информацию о начислении от системы расчета баллов
+	accrualResp, err := s.accrualClient.GetOrderAccrual(ctx, orderNumber)
+	if err != nil {
+		// В случае превышения лимита запросов, просто логируем ошибку и выходим
+		// Заказ будет обработан при следующей попытке
+		if err.Error() == "rate limit exceeded" {
+			return nil
+		}
+		return fmt.Errorf("failed to get accrual info: %w", err)
+	}
+
+	// Если ответ пустой, значит заказ еще не зарегистрирован в системе начислений
+	if accrualResp == nil {
+		if err := s.storage.UpdateOrderStatus(ctx, order.ID, models.OrderStatusProcessing, 0); err != nil {
+			return fmt.Errorf("failed to update order status: %w", err)
+		}
+		return nil
+	}
+
+	// Обновляем статус и начисление в соответствии с ответом от системы
+	if err := s.storage.UpdateOrderStatus(ctx, order.ID, accrualResp.Status, accrualResp.Accrual); err != nil {
+		return fmt.Errorf("failed to update order: %w", err)
+	}
+
+	// Если заказ обработан и есть начисление, обновляем баланс пользователя
+	if accrualResp.Status == models.OrderStatusProcessed && accrualResp.Accrual > 0 {
+		if err := s.storage.UpdateBalance(ctx, order.UserID, accrualResp.Accrual); err != nil {
+			return fmt.Errorf("failed to update user balance: %w", err)
+		}
 	}
 
 	return nil

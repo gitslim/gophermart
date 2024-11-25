@@ -32,6 +32,7 @@ var (
 	UpdateOrderStatus     string
 	CreateWithdrawalQuery string
 	GetUserWithdrawals    string
+	GetOrdersByStatuses   string
 )
 
 // PgStorage реализует интерфейс storage.Storage для PostgreSQL
@@ -52,6 +53,7 @@ func loadQueries() {
 		"update_order_status.sql":  &UpdateOrderStatus,
 		"create_withdrawal.sql":    &CreateWithdrawalQuery,
 		"get_user_withdrawals.sql": &GetUserWithdrawals,
+		"get_orders_by_statuses.sql": &GetOrdersByStatuses,
 	}
 
 	for file, qPtr := range queries {
@@ -272,4 +274,37 @@ func (s *PgStorage) GetUserWithdrawals(ctx context.Context, userID int64) ([]*mo
 	}
 
 	return withdrawals, nil
+}
+
+// GetOrdersByStatuses возвращает заказы с указанными статусами
+func (s *PgStorage) GetOrdersByStatuses(ctx context.Context, statuses []string) ([]*models.Order, error) {
+	rows, err := s.db.Query(ctx, GetOrdersByStatuses, statuses)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get orders by statuses: %w", err)
+	}
+	defer rows.Close()
+
+	var orders []*models.Order
+	for rows.Next() {
+		order := &models.Order{}
+		err := rows.Scan(
+			&order.ID,
+			&order.Number,
+			&order.UserID,
+			&order.Status,
+			&order.Accrual,
+			&order.UploadedAt,
+			&order.ProcessedAt,
+		)
+		if err != nil {
+			return nil, fmt.Errorf("failed to scan order: %w", err)
+		}
+		orders = append(orders, order)
+	}
+
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("error iterating orders: %w", err)
+	}
+
+	return orders, nil
 }
