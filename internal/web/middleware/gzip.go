@@ -21,7 +21,7 @@ func (w *gzipResponseWriter) Write(data []byte) (int, error) {
 }
 
 func isCompressionAcceptable(c *gin.Context) bool {
-	return strings.Contains(c.GetHeader(httpconst.HeaderAcceptEncoding), httpconst.AcceptEncodingGzip) // TODO: better check
+	return strings.Contains(c.GetHeader(httpconst.HeaderAcceptEncoding), httpconst.AcceptEncodingGzip)
 }
 
 func isContentTypeCompressable(c *gin.Context) bool {
@@ -55,7 +55,7 @@ func GzipMiddleware() gin.HandlerFunc {
 
 		if isCompressionAcceptable(c) && isContentTypeCompressable(c) {
 			// gzWriter := gzip.NewWriter(c.Writer)
-			gzWriter, err := gzip.NewWriterLevel(c.Writer, gzip.BestSpeed) // TODO: make shared writer with Reset()
+			gzWriter, err := gzip.NewWriterLevel(c.Writer, gzip.BestSpeed)
 			if err != nil {
 				c.AbortWithStatus(http.StatusInternalServerError)
 				return

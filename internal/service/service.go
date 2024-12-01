@@ -26,10 +26,3 @@ type BalanceService interface {
 	Withdraw(ctx context.Context, userID int64, orderNumber string, amount float64) error
 	GetWithdrawals(ctx context.Context, userID int64) ([]*models.Withdrawal, error)
 }
-
-// Service объединяет все сервисные интерфейсы
-type Service interface {
-	UserService
-	OrderService
-	BalanceService
-}

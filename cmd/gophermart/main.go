@@ -1,6 +1,7 @@
 package main
 
 import (
+	"github.com/gitslim/gophermart/internal/accrual"
 	"github.com/gitslim/gophermart/internal/conf"
 	"github.com/gitslim/gophermart/internal/logging"
 	"github.com/gitslim/gophermart/internal/logging/sugared"
@@ -15,6 +16,7 @@ import (
 	"github.com/gitslim/gophermart/internal/web/handlers"
 	"github.com/gitslim/gophermart/internal/web/middleware"
 	"github.com/gitslim/gophermart/internal/web/router"
+	"github.com/gitslim/gophermart/internal/workers"
 	"go.uber.org/fx"
 )
 
@@ -33,14 +35,24 @@ func CreateApp() fx.Option {
 		// Хранилище
 		fx.Provide(
 			postgres.NewConnPool,
-			fx.Annotate(postgres.NewPgStorage, fx.As(new(storage.Storage))),
+			fx.Annotate(postgres.NewPgUserStorage, fx.As(new(storage.UserStorage))),
+			fx.Annotate(postgres.NewPgOrderStorage, fx.As(new(storage.OrderStorage))),
+			fx.Annotate(postgres.NewPgWithdrawalStorage, fx.As(new(storage.WithdrawalStorage))),
 		),
+
+		// Клиент системы начислений
+		fx.Provide(accrual.NewClient),
 
 		// Сервисы
 		fx.Provide(
 			fx.Annotate(user.NewUserService, fx.As(new(service.UserService))),
 			fx.Annotate(order.NewOrderService, fx.As(new(service.OrderService))),
 			fx.Annotate(balance.NewBalanceService, fx.As(new(service.BalanceService))),
+		),
+
+		// Воркеры
+		fx.Provide(
+			workers.NewOrderProcessingWorker,
 		),
 
 		// Веб-компоненты
@@ -56,9 +68,10 @@ func CreateApp() fx.Option {
 			migrations.RunMigrations,
 		),
 
+		// Запуск воркера обработки заказов
+		fx.Invoke(workers.RegisterOrderProcessingWorkerHooks),
+
 		// Запуск сервера
-		fx.Invoke(
-			web.RegisterServerHooks,
-		),
+		fx.Invoke(web.RegisterServerHooks),
 	)
 }

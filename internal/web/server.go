@@ -13,7 +13,7 @@ import (
 // RegisterServerHooks регистрирует хуки для запуска и остановки HTTP сервера
 func RegisterServerHooks(lc fx.Lifecycle, cfg *conf.Config, log logging.Logger, router *gin.Engine) {
 	srv := &http.Server{
-		Addr:    cfg.RunAddrress,
+		Addr:    cfg.RunAddress,
 		Handler: router,
 	}
 

@@ -14,7 +14,6 @@ func NewRouter(handler *handlers.Handler, auth *middleware.AuthMiddleware) *gin.
 	r.Use(middleware.GzipMiddleware())
 
 	// Пинг для проверки здоровья
-	// TODO: добавить проверку бд?
 	r.GET("/ping", func(c *gin.Context) {
 		c.JSON(http.StatusOK, gin.H{"message": "pong"})
 	})

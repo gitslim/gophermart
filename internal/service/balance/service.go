@@ -12,19 +12,21 @@ import (
 
 // BalanceServiceImpl реализует интерфейс service.BalanceService
 type BalanceServiceImpl struct {
-	storage storage.Storage
+	userStorage       storage.UserStorage
+	withdrawalStorage storage.WithdrawalStorage
 }
 
 // NewBalanceService создает новый экземпляр сервиса баланса
-func NewBalanceService(storage storage.Storage) service.BalanceService {
+func NewBalanceService(userStorage storage.UserStorage, withdrawalStorage storage.WithdrawalStorage) service.BalanceService {
 	return &BalanceServiceImpl{
-		storage: storage,
+		userStorage:       userStorage,
+		withdrawalStorage: withdrawalStorage,
 	}
 }
 
 // GetBalance возвращает текущий баланс пользователя
 func (s *BalanceServiceImpl) GetBalance(ctx context.Context, userID int64) (float64, error) {
-	user, err := s.storage.GetUserByID(ctx, userID)
+	user, err := s.userStorage.GetUserByID(ctx, userID)
 	if err != nil {
 		return 0, fmt.Errorf("failed to get user: %w", err)
 	}
@@ -38,7 +40,7 @@ func (s *BalanceServiceImpl) GetBalance(ctx context.Context, userID int64) (floa
 // Withdraw списывает средства с баланса пользователя
 func (s *BalanceServiceImpl) Withdraw(ctx context.Context, userID int64, orderNumber string, amount float64) error {
 	// Проверяем баланс пользователя
-	user, err := s.storage.GetUserByID(ctx, userID)
+	user, err := s.userStorage.GetUserByID(ctx, userID)
 	if err != nil {
 		return fmt.Errorf("failed to get user: %w", err)
 	}
@@ -58,12 +60,12 @@ func (s *BalanceServiceImpl) Withdraw(ctx context.Context, userID int64, orderNu
 		ProcessedAt: time.Now(),
 	}
 
-	if err := s.storage.CreateWithdrawal(ctx, withdrawal); err != nil {
+	if err := s.withdrawalStorage.CreateWithdrawal(ctx, withdrawal); err != nil {
 		return fmt.Errorf("failed to create withdrawal: %w", err)
 	}
 
 	// Обновляем баланс пользователя
-	if err := s.storage.UpdateBalance(ctx, userID, -amount); err != nil {
+	if err := s.userStorage.UpdateBalance(ctx, userID, -amount); err != nil {
 		return fmt.Errorf("failed to update balance: %w", err)
 	}
 
@@ -72,5 +74,5 @@ func (s *BalanceServiceImpl) Withdraw(ctx context.Context, userID int64, orderNu
 
 // GetWithdrawals возвращает историю списаний пользователя
 func (s *BalanceServiceImpl) GetWithdrawals(ctx context.Context, userID int64) ([]*models.Withdrawal, error) {
-	return s.storage.GetUserWithdrawals(ctx, userID)
+	return s.withdrawalStorage.GetUserWithdrawals(ctx, userID)
 }
